@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Course = require("../models/coursesModel");
 const User = require("../models/usersModel")
 const Post = require("../models/postModel")
+const File = require("../models/filemodels.js")
 const SendMailToTeacher = require("./mailControllers.js")
 exports.getAllCourses = asyncHandler(async (req, res, next) => {
     const courses = await Course.find()
@@ -11,30 +12,52 @@ exports.getAllCourses = asyncHandler(async (req, res, next) => {
     })
 })
 
+
 exports.addCourse = asyncHandler(async (req, res, next) => {
     const courseData = req.body;
-
     // Create a new course directly using Course.create()
     const newCourse = await Course.create(courseData);
-
 
     res.status(201).json({
         status: 'success',
         course: newCourse
+    
     });
 });
+   
+   
+
+
 
 exports.getCourseByID = asyncHandler(async (req, res, next) => {
-    const { _id } = req.params
-    console.log(req.user)
+    const { _id } = req.params;
+  
     const course = await Course.findById(_id)
-    .populate('subscription.userId','firstName lastName')
-    console.log(course)
+        .populate('subscription.userId', 'firstName lastName')
+        .populate('contents', 'file');
+  
+    console.log(course);
+  
     res.status(200).json({
         status: 'success',
         course
-    })
-})
+    });
+});
+// need to find the courses that the user is subscribed to user.courses[] = course._id and then find the course using the course._id
+// then populate the course with the user's details
+// then return the courses
+
+exports.UserInCourses = asyncHandler(async (req, res, next) => {
+    const userscourses = await Course.find({ _id: { $in: req.user.courses } })
+    res.status(200).json({
+        status: 'success',
+        userscourses
+    });
+});
+
+
+
+
 
 
 
@@ -42,6 +65,7 @@ exports.getCourseByID = asyncHandler(async (req, res, next) => {
 
 
 exports.updateCourse = asyncHandler(async (req, res, next) => {
+    console.log(req.body, req.params)
     const { _id } = req.params
     const updatedDetails = req.body
     const updatedCourse = await Course.findByIdAndUpdate(_id, updatedDetails, { new: true })
@@ -56,12 +80,12 @@ exports.deleteCourse = asyncHandler(async (req, res, next) => {
     // let role = req.user.role
     const course = await Course.findById(_id)
     const subscription = course.subscription.find(sub => sub.userId === req.user._id.toString());
-    if (course.subscription.role !== 'teacher') {
-        res.status(403).json({
-            status: 'fail',
-            message: 'You are not authorized to delete this course'
-        })
-    }
+    // if (course.subscription.role !== 'teacher') {
+    //     res.status(403).json({
+    //         status: 'fail',
+    //         message: 'You are not authorized to delete this course'
+    //     })
+    // }
     await Course.findByIdAndDelete(_id)
     await Post.find({courseId: _id}).deleteMany()
 
@@ -80,22 +104,22 @@ const updateCourseAndUser = async (courseId, userId, courseUpdate, userUpdate) =
 };
 
 exports.subscribe = asyncHandler(async (req, res, next) => {
-    const { _id: courseId } = req.params;
+    const { _id: courseid } = req.params;
+    console.log(req.user)
     let userId = req.user._id;
-
-    const isExist = req.user.courses.findIndex(courseId => courseId.toString() == courseId)
-
+    const isExist = req.user.courses.findIndex(courseId => courseId.toString() == courseid)
     if (isExist !== -1) {
         res.status(403).json({
             status: 'fail',
             message: 'You are already subscribed to this course'
         });
         return
+        
     }
     if (req.user.role === 'teacher') {
         _Id = req.body.userId;
     }
-    const course = await Course.findById(courseId);
+    const course = await Course.findById(courseid);
     // console.log({
     //     // subscriptionIndex,
     //     course   });
@@ -105,9 +129,9 @@ exports.subscribe = asyncHandler(async (req, res, next) => {
     }
     const courseUpdate = { $addToSet: { subscription: { userId: userId.toString(), role: null } } }
 
-    const userUpdate = { $push: { courses: courseId } };
+    const userUpdate = { $push: { courses: courseid } };
 
-    const { course: updatedCourse, user } = await updateCourseAndUser(courseId, userId, courseUpdate, userUpdate);
+    const { course: updatedCourse, user } = await updateCourseAndUser(courseid, userId, courseUpdate, userUpdate);
     
     SendMailToTeacher.SendMailToTeacher(req, res)
 
@@ -121,6 +145,7 @@ exports.subscribe = asyncHandler(async (req, res, next) => {
 exports.subDelete = asyncHandler(async (req, res, next) => {
     const { _id} = req.params;
     let userId = req.user._id;
+   
     if (req.user.role === 'teacher') {
         userId = req.body.userId;
     }

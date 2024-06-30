@@ -66,6 +66,7 @@ const protect = asyncHandler(async (req, res, next) => {
 exports.restrictTo = (...role) => {
     return async (req, res, next) => {
         if (!role.includes(req.user.role)) {
+            
             return next(
                 new AppError(403, 'You do not have permission to perform this action')
             );
@@ -79,7 +80,6 @@ exports.isByUser = asyncHandler(async (req, res, next) => {
     const { userId } = req.body;
     const user = req.user;
     if (userId !== user._id.toString()) {
-        console.log(userId, user._id.toString())
         return next(new AppError(403, 'You are not authorized to perform this action'));
     }
     next();

@@ -3,13 +3,15 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/usersModel');
 const Course = require('../models/coursesModel');
 
+
+
+
 exports.SendMailToTeacher = asyncHandler(async (req, res, next) => {
   try {
     const { _id } = req.params;
     const course = await Course.findById(_id);
     const student = await User.findById(req.user._id);
     const teacher = await User.findById(course.userId);
-    console.log(course.id ,student.id,);
 
     if (!course || !student || !teacher) {
       return res.status(404).json({
@@ -69,6 +71,6 @@ exports.SendMailToTeacher = asyncHandler(async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error in SendMailToTeacher:', error);
-    next(error);
+  
   }
 });
